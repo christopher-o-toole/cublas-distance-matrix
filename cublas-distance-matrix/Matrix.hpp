@@ -10,8 +10,8 @@
 #include "util.hpp"
 
 #define ENABLE_IF_NUMERIC(T) typename std::enable_if<std::is_arithmetic<T>::value, T>::type
-#define ENABLE_IF_CUDA_ALLOCATOR(T, Container) std::enable_if<std::is_base_of<CudaAllocator<T>, Container<T>>::value, CudaAllocator<T>>
-#define ENABLE_IF_STANDARD_ALLOCATOR(T, Container) std::enable_if<std::is_base_of<StandardAllocator<T>, Container<T>>::value, StandardAllocator<T>>
+#define ENABLE_IF_NOT_CUDA_ALLOCATOR(U, Container) typename std::enable_if<!std::is_base_of<CudaAllocator<U>, Container<U>>::value, bool>::type = true
+#define ENABLE_IF_CUDA_ALLOCATOR(U, Container) typename std::enable_if<std::is_base_of<CudaAllocator<U>, Container<U>>::value, bool>::type = true
 
 template<typename T, template <typename...> class Container,
          typename = ENABLE_IF_NUMERIC(T)>
@@ -23,7 +23,7 @@ private:
   Container<T> m_data;
 
 public:
-  template<typename U = T, typename std::enable_if<!std::is_base_of<CudaAllocator<U>, Container<U>>::value, bool>::type = true>
+  template<typename U = T, ENABLE_IF_NOT_CUDA_ALLOCATOR(U, Container)>
   Matrix(size_t m, size_t n, bool set_to_zero = true)
     : m_rows(m), m_columns(n), m_data(m*n)
   {
@@ -34,22 +34,17 @@ public:
     }
   }
   
-  template<typename U = T, typename std::enable_if<std::is_base_of<CudaAllocator<U>, Container<U>>::value, bool>::type = true>
-  Matrix(size_t m, size_t n, bool set_to_zero = true)
+  template<typename U = T, ENABLE_IF_CUDA_ALLOCATOR(U, Container)>
+  Matrix(size_t m, size_t n)
     : m_rows(m), m_columns(n), m_data(m*n)
   {
     CUBLAS::Library::Init();
-
-    if (set_to_zero)
-    {
-      m_data.fill(0);
-    }
-
+    T* raw_data = new T[m * n]{ 0 };
+    std::unique_ptr<T[]> data(raw_data);
     std::cout << "cublas init" << std::endl;
-    CUBLAS_SAFE_CALL(cublasSetMatrix(m, n, sizeof(T), this->m_data.get()));
+    CUBLAS_SAFE_CALL(cublasSetMatrix(m, n, sizeof(T), raw_data, m, m_data.raw(), m));
   }
   
-
   T& operator[](const std::pair<size_t, size_t>& index)
   {
     const size_t _index = index.first * rows() + index.second;

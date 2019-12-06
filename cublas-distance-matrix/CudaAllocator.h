@@ -21,5 +21,6 @@ public:
   CudaAllocator(const StandardAllocator<T>& allocator);
   CudaAllocator<T>& operator=(CudaAllocator<T> allocator);
   virtual void fill(const T& value) override;
+  T* raw() { return m_raw_data; }
   ~CudaAllocator();
 };
