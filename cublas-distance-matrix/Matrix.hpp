@@ -6,11 +6,15 @@
 #include <sstream>
 #include <initializer_list>
 
-#include "Allocator.hpp"
+#include "cublas_util.hpp"
 #include "util.hpp"
 
+#define ENABLE_IF_NUMERIC(T) typename std::enable_if<std::is_arithmetic<T>::value, T>::type
+#define ENABLE_IF_CUDA_ALLOCATOR(T, Container) std::enable_if<std::is_base_of<CudaAllocator<T>, Container<T>>::value, CudaAllocator<T>>
+#define ENABLE_IF_STANDARD_ALLOCATOR(T, Container) std::enable_if<std::is_base_of<StandardAllocator<T>, Container<T>>::value, StandardAllocator<T>>
+
 template<typename T, template <typename...> class Container,
-         typename = typename std::enable_if<std::is_arithmetic<T>::value, T>::type>
+         typename = ENABLE_IF_NUMERIC(T)>
 class Matrix
 {
 private:
@@ -19,15 +23,32 @@ private:
   Container<T> m_data;
 
 public:
+  template<typename U = T, typename std::enable_if<!std::is_base_of<CudaAllocator<U>, Container<U>>::value, bool>::type = true>
   Matrix(size_t m, size_t n, bool set_to_zero = true)
-    : m_rows(m), m_columns(n), m_data(m* n)
+    : m_rows(m), m_columns(n), m_data(m*n)
   {
+    std::cout << "is base of:" << std::is_base_of<CudaAllocator<T>, Container<T>>::value << std::endl;
     if (set_to_zero)
     {
-
       m_data.fill(0);
     }
   }
+  
+  template<typename U = T, typename std::enable_if<std::is_base_of<CudaAllocator<U>, Container<U>>::value, bool>::type = true>
+  Matrix(size_t m, size_t n, bool set_to_zero = true)
+    : m_rows(m), m_columns(n), m_data(m*n)
+  {
+    CUBLAS::Library::Init();
+
+    if (set_to_zero)
+    {
+      m_data.fill(0);
+    }
+
+    std::cout << "cublas init" << std::endl;
+    CUBLAS_SAFE_CALL(cublasSetMatrix(m, n, sizeof(T), this->m_data.get()));
+  }
+  
 
   T& operator[](const std::pair<size_t, size_t>& index)
   {

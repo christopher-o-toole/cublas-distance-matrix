@@ -80,9 +80,15 @@
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Allocator.h" />
     <ClInclude Include="Allocator.hpp" />
+    <ClInclude Include="cublas_util.hpp" />
+    <ClInclude Include="CudaAllocator.h" />
+    <ClInclude Include="CudaAllocator.hpp" />
     <ClInclude Include="cuda_util.h" />
     <ClInclude Include="Matrix.hpp" />
+    <ClInclude Include="StandardAllocator.h" />
+    <ClInclude Include="StandardAllocator.hpp" />
     <ClInclude Include="util.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

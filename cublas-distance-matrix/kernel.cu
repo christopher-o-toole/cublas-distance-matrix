@@ -1,7 +1,8 @@
 #include <iostream>
 
-#include "cuda_util.h"
 #include "Allocator.hpp"
+#include "StandardAllocator.hpp"
+#include "CudaAllocator.hpp"
 #include "Matrix.hpp"
 
 int main()
