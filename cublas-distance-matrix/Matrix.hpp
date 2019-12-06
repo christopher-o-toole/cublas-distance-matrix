@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <sstream>
 #include <initializer_list>
+#include <vector>
 
 #include "cublas_util.hpp"
 #include "util.hpp"
@@ -23,6 +24,12 @@ private:
   Container<T> m_data;
 
 public:
+  Matrix()
+    : m_rows(0), m_columns(0)
+  {
+
+  }
+
   template<typename U = T, ENABLE_IF_NOT_CUDA_ALLOCATOR(U, Container)>
   Matrix(size_t m, size_t n, bool set_to_zero = true)
     : m_rows(m), m_columns(n), m_data(m*n)
@@ -31,6 +38,36 @@ public:
     if (set_to_zero)
     {
       m_data.fill(0);
+    }
+  }
+
+  template<typename U = T, ENABLE_IF_NOT_CUDA_ALLOCATOR(U, Container)>
+  Matrix(const std::initializer_list<std::vector<T>>& matrix)
+    : m_data(nullptr)
+  {
+    m_rows = matrix.size();
+
+    if (m_rows > 0)
+    {
+      m_columns = matrix.begin()->size();
+    }
+
+    ASSERT(m_rows > 0 && m_columns > 0, "Cannot create a matrix of size (" << m_rows << ", " << m_columns << ").");
+    m_data = Container<T>(m_rows * m_columns);
+    size_t i = 0;
+    size_t j = 0;
+
+    for (const auto& row : matrix)
+    {
+      ASSERT(m_columns < row.size(), "Expected all rows to have " << m_columns
+        << " columns. Got a row with " << row.size() << " elements.");
+
+      for (const auto& element : row)
+      {
+        (*this)[{i, j++}] = element;
+      }
+
+      i++;
     }
   }
   

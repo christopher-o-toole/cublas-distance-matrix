@@ -7,7 +7,8 @@ template <typename T>
 StandardAllocator<T>::StandardAllocator(const size_t size)
   : Allocator<T[]>(size)
 {
-  m_data.reset(new T[size]{});
+  m_raw_data = new T[size]{};
+  m_data.reset(m_raw_data);
 }
 
 template <typename T>

@@ -10,7 +10,7 @@ template <typename T,
 {
 protected:
   std::unique_ptr<T, Deleter> m_data;
-  T* m_raw_data;
+  BaseType* m_raw_data;
   size_t m_size;
 
 public:
