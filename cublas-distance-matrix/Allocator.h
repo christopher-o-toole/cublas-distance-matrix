@@ -22,6 +22,14 @@ public:
 
   }
 
+  Allocator(const size_t size, const Deleter& deleter)
+    : m_size(size),
+      m_data(nullptr, deleter),
+      m_raw_data(nullptr)
+  {
+
+  }
+
   Allocator(Allocator<T, Deleter>&& rvalue) noexcept :
     Allocator<T, Deleter>(rvalue.size())
   {

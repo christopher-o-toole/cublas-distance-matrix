@@ -1,10 +1,12 @@
 #pragma once
 
+#include "Allocator.hpp"
 #include "CudaAllocator.h"
+#include "StandardAllocator.h"
 
 template <typename T>
 CudaAllocator<T>::CudaAllocator(const size_t size)
-  : Allocator<T, decltype(cuda_free)>(size)
+  : Allocator<T, cuda_free>(size, [](void* ptr) { cudaFree(ptr); })
 {
   m_raw_data = nullptr;
   CUDA_SAFE_CALL(cudaMalloc((void**)&m_raw_data, size * sizeof(T)));
@@ -12,29 +14,39 @@ CudaAllocator<T>::CudaAllocator(const size_t size)
 }
 
 template <typename T>
+CudaAllocator<T>::CudaAllocator(const StandardAllocator<T>& allocator)
+  : CudaAllocator<T>(allocator.size())
+{
+  CUDA_SAFE_CALL(cudaMemcpy((void*)m_raw_data,
+    (void*)allocator.raw(),
+    allocator.size() * sizeof(T),
+    cudaMemcpyHostToDevice));
+}
+
+
+template <typename T>
 CudaAllocator<T>::CudaAllocator(const CudaAllocator<T>& allocator)
   : CudaAllocator<T>(allocator.size())
 {
   CUDA_SAFE_CALL(cudaMemcpy((void*)m_raw_data,
-    (void*)allocator.m_raw_data,
+    (void*)allocator.raw(),
     allocator.size() * sizeof(T),
     cudaMemcpyDeviceToDevice));
 }
 
 template <typename T>
-CudaAllocator<T>::CudaAllocator(const StandardAllocator<T>& allocator)
-  : CudaAllocator<T>(allocator.size())
+CudaAllocator<T>::CudaAllocator(CudaAllocator<T>&& allocator)
+  : CudaAllocator<T>(0)
 {
-  CUDA_SAFE_CALL(cudaMemcpy((void*)m_raw_data,
-    (void*)allocator.m_raw_data,
-    allocator.size() * sizeof(T),
-    cudaMemcpyHostToDevice));
+  m_data = std::move(allocator.m_data);
+  m_raw_data = allocator.m_raw_data;
+  m_size = allocator.m_size;
 }
 
 template <typename T>
 CudaAllocator<T>& CudaAllocator<T>::operator=(CudaAllocator<T> allocator)
 {
-  this->swap(*this, allocator);
+  swap(*this, allocator);
   return *this;
 }
 

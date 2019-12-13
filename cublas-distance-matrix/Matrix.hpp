@@ -25,7 +25,7 @@ private:
 
 public:
   Matrix()
-    : m_rows(0), m_columns(0)
+    : m_rows(0), m_columns(0), m_data(0)
   {
 
   }
@@ -34,16 +34,25 @@ public:
   Matrix(size_t m, size_t n, bool set_to_zero = true)
     : m_rows(m), m_columns(n), m_data(m*n)
   {
-    std::cout << "is base of:" << std::is_base_of<CudaAllocator<T>, Container<T>>::value << std::endl;
     if (set_to_zero)
     {
       m_data.fill(0);
     }
   }
 
+  template<typename U = T, ENABLE_IF_CUDA_ALLOCATOR(U, Container)>
+  Matrix(size_t m, size_t n)
+    : m_rows(m), m_columns(n), m_data(m * n)
+  {
+    CUBLAS::Library::Init();
+    T* raw_data = new T[m * n]{ 0 };
+    std::unique_ptr<T[]> data(raw_data);
+    CUBLAS_SAFE_CALL(cublasSetMatrix(m, n, sizeof(T), raw_data, m, m_data.raw(), m));
+  }
+
   template<typename U = T, ENABLE_IF_NOT_CUDA_ALLOCATOR(U, Container)>
   Matrix(const std::initializer_list<std::vector<T>>& matrix)
-    : m_data(nullptr)
+    : m_data(0)
   {
     m_rows = matrix.size();
 
@@ -59,8 +68,8 @@ public:
 
     for (const auto& row : matrix)
     {
-      ASSERT(m_columns < row.size(), "Expected all rows to have " << m_columns
-        << " columns. Got a row with " << row.size() << " elements.");
+      ASSERT(m_columns == row.size(), "Expected a row with size " << m_columns
+        << ", got a row with size " << row.size() << " instead.");
 
       for (const auto& element : row)
       {
@@ -68,18 +77,38 @@ public:
       }
 
       i++;
+      j = 0;
     }
   }
-  
-  template<typename U = T, ENABLE_IF_CUDA_ALLOCATOR(U, Container)>
-  Matrix(size_t m, size_t n)
-    : m_rows(m), m_columns(n), m_data(m*n)
+
+  Matrix(const Matrix<T, Container>& matrix)
+    : m_data(matrix.m_data),
+      m_rows(matrix.m_rows),
+      m_columns(matrix.m_columns)
   {
-    CUBLAS::Library::Init();
-    T* raw_data = new T[m * n]{ 0 };
-    std::unique_ptr<T[]> data(raw_data);
-    std::cout << "cublas init" << std::endl;
-    CUBLAS_SAFE_CALL(cublasSetMatrix(m, n, sizeof(T), raw_data, m, m_data.raw(), m));
+
+  }
+
+  Matrix(Matrix<T, Container>&& matrix)
+    : m_data(std::move(matrix.m_data)),
+      m_rows(matrix.m_rows),
+      m_columns(matrix.m_columns)
+  {
+
+  }
+
+  template <class U, template <typename...> class OtherContainer>
+  operator Matrix<U, OtherContainer>()
+  {
+    Matrix<U, OtherContainer> matrix(rows(), columns());
+    matrix.m_data = m_data;
+    return matrix;
+  }
+
+  Matrix<T, Container>& operator=(Matrix<T, Container> rhs)
+  {
+    swap(*this, rhs);
+    return *this;
   }
   
   T& operator[](const std::pair<size_t, size_t>& index)
@@ -105,8 +134,14 @@ public:
     return m_columns;
   }
 
-  template<typename U, template <typename...> class Container>
-  friend std::ostream& operator<<(std::ostream& os, const Matrix<U, Container>& rhs);
+  template<typename U, template <typename...> class OtherContainer>
+  friend std::ostream& operator<<(std::ostream& os, const Matrix<U, OtherContainer>& rhs);
+
+  template <typename U, template <typename...> class OtherContainer>
+  friend void swap(Matrix<U, OtherContainer>& lhs, Matrix<U, OtherContainer>& rhs);
+
+  template <typename U, template <typename...> class OtherContainer, typename DefaultParam>
+  friend class Matrix;
 };
 
 template<typename U, template <typename...> class Container>
@@ -131,4 +166,12 @@ std::ostream& operator<<(std::ostream& os, const Matrix<U, Container>& rhs)
 
   os << stream.str();
   return os;
+}
+
+template <typename U, template <typename...> class Container>
+void swap(Matrix<U, Container>& lhs, Matrix<U, Container>& rhs)
+{
+  std::swap(lhs.m_data, rhs.m_data);
+  std::swap(lhs.m_rows, rhs.m_rows);
+  std::swap(lhs.m_columns, rhs.m_columns);
 }

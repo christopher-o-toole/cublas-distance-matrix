@@ -11,7 +11,7 @@ const BaseType& Allocator<T, Deleter, BaseType>::at(const size_t index) const
 template<typename T, class Deleter, typename BaseType>
 BaseType& Allocator<T, Deleter, BaseType>::at(const size_t index)
 {
-  return m_raw_data[index];
+  return m_data[index];
 }
 
 template<typename T, class Deleter, typename BaseType>
